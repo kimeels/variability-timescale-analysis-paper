@@ -1,0 +1,18 @@
+Individual class directories contain radio light-curves collected from the literature. The column headings in the files are as follows:
+col. 1 - Time (days)
+col. 2 - Flux density (Jy)
+col. 3 - Flux density error (Jy)
+
+
+Additionally, within some of the individual class directories, the 'GBI' directories contain light-curves downloaded from the GBI database and have the following column headings:
+
+col. 1 - Mod. Julian Date of observation (JD-2400000.5).
+col. 2 - Local Hour Angle of observation (hours).
+col. 3 - Flux Density in Janskys at  2.25 GHz
+col. 4 - Flux Density in Janskys at  8.3 GHz.
+col. 5 - Spectral index.
+col. 6 - Estimated 1-sigma error of col. 3.
+col. 7 - Estimated 1-sigma error of col. 4.
+
+
+List of sources together with distances and frequencies is given in 'Distances-types.txt'.
