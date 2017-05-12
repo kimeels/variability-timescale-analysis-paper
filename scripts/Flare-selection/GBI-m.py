@@ -231,13 +231,7 @@ def find_flares(dset, zeropoint, sigma):
             f_dec = f_all[decline_idx]
             f_dec_err = f_all_err[decline_idx]
             
-##feb            f_allx = f_all - base 
-            # Shift f_allx array by the minimum value of the flux in the array such that there are no negative flux measurements and we can log the data
-## feb            min_all = abs(np.min(f_allx))
-## feb            f_risex = f_rise - base + min_all
-## feb            f_decx = f_dec - base + min_all
-## feb            f_allx = f_all - base  + min_all
-## feb            fmax = f_all[peak_idx[0]] - base + min_all
+
 
             ## Overplot median
             clipped_fluxes = get_sigma_clipped_fluxes(fluxes)
@@ -261,7 +255,6 @@ def find_flares(dset, zeropoint, sigma):
                 t_min_idx = np.argmin(t_rise)
                 t_min = t_rise[t_min_idx]
                 f_t_min = f_rise[t_min_idx]
-#                f_rise = f_rise - base + min_all
                 pos = f_rise>0
                 neg = f_rise<=0
                 f_neg = f_rise[neg]
@@ -319,7 +312,6 @@ def find_flares(dset, zeropoint, sigma):
                 t_max_idx = np.argmax(t_dec)
                 t_max = t_dec[t_max_idx]
                 f_t_max = f_dec[t_max_idx]
-                #f_dec = f_dec - base + min_all
                 pos = f_dec>0
                 neg = f_dec<=0
                 f_neg = f_dec[neg] 

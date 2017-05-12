@@ -223,17 +223,26 @@ def find_flares(dset, zeropoint, sigma):
             f_dec_err = f_all_err[decline_idx]
            
             base = np.percentile(f_all,1)
-            f_allx = f_all - base 
-            min_all = abs(np.min(f_allx))
-            f_risex = f_rise - base + min_all
-            f_decx = f_dec - base + min_all
-            f_allx = f_all - base  + min_all
-            fmax = f_all[peak_idx[0]] - base + min_all
+
+
+            fmin_flare = min(np.min(f_rise), np.min(f_dec))
+            base_new = min(base, fmin_flare)
+            f_allx = f_all - base_new 
+            f_risex = f_rise - base_new
+            f_decx = f_dec - base_new
+            f_allx = f_all - base_new
+            fmax = f_all[peak_idx[0]] - base_new
+
+
+
+
+
+
 
             ## Try to overplot median
             clipped_fluxes = get_sigma_clipped_fluxes(fluxes)
             clipped_median = np.percentile(fluxes, 10)
-            med = clipped_median - base + min_all
+            med = clipped_median - base_new
             ###
             
             fig = plt.figure()
@@ -256,7 +265,7 @@ def find_flares(dset, zeropoint, sigma):
                 t_min = t_rise[t_min_idx]
                 f_t_min = f_rise[t_min_idx]
                 #print "Rise params init", init_rise_pars
-                f_rise = f_rise - base + min_all
+                f_rise = f_rise - base_new
                 pos = f_rise>0
                 neg = f_rise<=0
                 f_neg = f_rise[neg] 
@@ -313,7 +322,7 @@ def find_flares(dset, zeropoint, sigma):
                 t_max = t_dec[t_max_idx]
                 f_t_max = f_dec[t_max_idx]
                 #print "Dec params init", init_dec_pars
-                f_dec = f_dec - base + min_all
+                f_dec = f_dec - base_new
                 pos = f_dec>0
                 neg = f_dec<=0
                 f_neg = f_dec[neg] 

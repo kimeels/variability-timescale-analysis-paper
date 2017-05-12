@@ -36,13 +36,6 @@ def process_datafile(filename):
     f_dec = f_all[decline_idx]
     f_dec_err = f_all_err[decline_idx]
 
-    # Estimate the base of the lightcurve as a 1st percentile of the flux measurements & subtract it from the data
-#    base = np.percentile(f_all,1)
-#    f_allx = f_all - base
-#    min_all = abs(np.min(f_allx))
-#    f_risex = f_rise - base + min_all
-#    f_decx = f_dec - base + min_all
-#    f_allx = f_all - base + min_all
     fmax = f_all[fmax_ind]
 
     fig = plt.figure()
