@@ -1,11 +1,12 @@
 #!/usr/bin/env python
-import pylab
-import glob, os
-import math
+import glob
+import os
+
 import matplotlib.pyplot as plt
 import numpy as np
-import optparse
+import pylab
 from scipy.optimize import curve_fit
+
 
 def process_datafile(filename):
     R = open('results/measurements/{}_rise_parameters.txt'.format(id.split('.txt')[0]), 'w')

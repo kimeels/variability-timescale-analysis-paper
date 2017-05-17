@@ -1,11 +1,10 @@
-import scipy
-import scipy.signal
+import glob
+import os
+
+import numpy
 import numpy as np
 import pylab
-import glob, os
-import pylab
-import numpy
-import math
+
 
 def smooth(x,window_len=24,window='flat'):
     """smooth the data using a window with requested size.

@@ -1,18 +1,15 @@
-import glob, os
-import logging
-from operator import not_
-import os
 import csv
-import numpy as np
-import matplotlib.pyplot as plt
-from scipy.stats import norm
-from astropy.stats.funcs import sigma_clip
+import glob
+import logging
+import os
 from collections import namedtuple
-import matplotlib.gridspec as gridspec
-import math
-import optparse
-from scipy.optimize import curve_fit
 
+import matplotlib.gridspec as gridspec
+import matplotlib.pyplot as plt
+import numpy as np
+from astropy.stats import sigma_clip
+from scipy.optimize import curve_fit
+from scipy.stats import norm
 
 
 class std_keys():
@@ -518,7 +515,7 @@ def plot_dataset(d):
 if __name__ == '__main__':
     logging.basicConfig(level = logging.DEBUG)
     logger = logging.getLogger()
-    data_folder = os.path.expanduser('~/Desktop/code-test/data/')
+    data_folder = os.path.expanduser('~/test/vartest/')
     datafiles = glob.glob(data_folder+'/*')
     datasets = {}
 
