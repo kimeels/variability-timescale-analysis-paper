@@ -8,13 +8,15 @@ import pprint
 import sys
 from collections import defaultdict
 
+import attr
 import matplotlib.pyplot as plt
 
-import attr
 import flarefits.ingest as ingest
-from flarefits.fitting import analyze_gbi_unsmoothed
+from flarefits.fitting import analyze_gbi, smooth_with_window
 from flarefits.ingest import DataCols, FitMethods, IndexCols
-from flarefits.plot import plot_dataset_with_histogram, plot_flare
+from flarefits.plot import (
+    plot_dataset_with_histogram, plot_single_flare_lightcurve
+)
 
 logging.basicConfig(
     # level=logging.DEBUG,
@@ -94,25 +96,28 @@ def analyze_dataset(dataset_id, dataset_filepath, data_index):
     """
     For each data file, check the index and run the corresponding analysis.
     """
-    logger.info("Analyzing dataset {}".format(dataset_id))
+    fit_method = data_index[dataset_id][IndexCols.fit_method]
+    logger.info("Analyzing dataset {}, fit method {}".format(
+        dataset_id, fit_method))
     logger.debug("(Path: {}".format(dataset_filepath))
 
-    fit_method = data_index[dataset_id][IndexCols.fit_method]
     # logger.debug("Method: {}".format(fit_method))
     if fit_method == FitMethods.gbi:
         dataset = ingest.load_gbi_dataset(dataset_filepath, dataset_id)
-        data_props, flares = analyze_gbi_unsmoothed(dataset)
+        data_props, flares = analyze_gbi(dataset)
+    elif fit_method == FitMethods.gbi_smoothed:
+        dataset = ingest.load_gbi_dataset(dataset_filepath, dataset_id,
+                                          trim_outliers_below_percentile=3.)
+        dataset[DataCols.flux] = smooth_with_window(dataset[DataCols.flux])
+        data_props, flares = analyze_gbi(dataset)
     elif fit_method in (
-            FitMethods.gbi_smoothed,
             FitMethods.paper,
             FitMethods.paper_smoothed):
         # Fixme
         return None
     else:
         raise ValueError("Unknown fit method: {}".format(fit_method))
-
-    save_results(dataset_id, dataset, data_props, flares)
-
+    save_results(dataset_id, dataset, data_props, flares, fit_method)
 
 
 def ensure_dir(dirname):
@@ -123,22 +128,23 @@ def ensure_dir(dirname):
         raise RuntimeError("Path exists but is not directory: \n" + dirname)
 
 
-def save_results(dataset_id, dataset, dataset_properties, flares,
+def save_results(dataset_id, dataset, dataset_properties, flares, fit_method,
                  output_dir=DEFAULT_OUTPUT_DIR):
-    dataset_dir = os.path.join(output_dir, dataset_id)
+    dataset_dir = os.path.join(output_dir, fit_method, dataset_id)
     ensure_dir(dataset_dir)
     write_flares_to_json(
         os.path.join(dataset_dir, dataset_id + '_flares.json'),
         flares)
-    dataset_fig = plot_dataset_with_histogram(dataset, dataset_properties)
+    dataset_fig = plot_dataset_with_histogram(
+        dataset, dataset_properties, flares)
     dataset_fig_path = os.path.join(dataset_dir,
-                                    dataset_id + '_overview.'+PLOT_FORMAT)
+                                    dataset_id + '_overview.' + PLOT_FORMAT)
     dataset_fig.savefig(dataset_fig_path)
     plt.close(dataset_fig)
     timestamps = dataset[DataCols.time]
     for flr_count, flr in enumerate(flares):
-        ax = plot_flare(dataset, flr)
-        flare_filename = ("flare_{}_t{}_t{}."+PLOT_FORMAT).format(
+        ax = plot_single_flare_lightcurve(dataset, flr)
+        flare_filename = ("flare_{}_t{}_t{}." + PLOT_FORMAT).format(
             flr_count,
             timestamps[flr.rise],
             timestamps[flr.fall]

@@ -162,8 +162,36 @@ def standardize_gbi_dataset(raw_dataset):
     return raw_dataset
 
 
-def load_gbi_dataset(datafile_abspath, dataset_id):
+def load_gbi_dataset(datafile_abspath, dataset_id,
+                     trim_outliers_below_percentile=None):
+    """
+    Load a GBI dataset.
+
+    Load from GBI format files, and then convert to a dictionary of numpy arrays
+    etc with standard keys as listed in the ``DataCols`` class.
+
+    GBI data often has weird 'drop out' fluxes that look much lower than
+    rest of the timeseries, we assume these are due to some instrumental or
+    data-processing error. We trim them by simply dropping everything below
+    a certain percentile.
+
+    Args:
+        datafile_abspath (str): Path to dataset file (tab-separated values ascii)
+        dataset_id (str): Unique identifier
+        trim_outliers_below_percentile (float or None): Drop all flux values
+            (and corresponding timestamps, errors) below this percentile.
+
+    Returns:
+        dict: See ``DataCols`` class.
+    """
     raw_dataset = read_gbi_datafile(datafile_abspath)
     dataset = standardize_gbi_dataset(raw_dataset)
+    if trim_outliers_below_percentile is not None:
+        low_val_outlier_threshold= np.percentile(dataset[DataCols.flux],
+                                         trim_outliers_below_percentile)
+        good_data_idx = dataset[DataCols.flux] > low_val_outlier_threshold
+        for col in (DataCols.time, DataCols.flux, DataCols.flux_err, ):
+            dataset[col] = dataset[col][good_data_idx]
+
     dataset[DataCols.id] = dataset_id
     return dataset

@@ -5,13 +5,13 @@ import numpy as np
 import scipy.stats
 from matplotlib import gridspec
 
-from .fitting import (get_sigma_clipped_fluxes, straight_line)
+from .fitting import get_sigma_clipped_fluxes, straight_line
 from .ingest import DataCols
 
 logger = logging.getLogger(__name__)
 
 
-def plot_dataset_with_histogram(dataset, dataset_properties):
+def plot_dataset_with_histogram(dataset, dataset_properties, flares):
     fig = plt.gcf()
     # Set up a 3 row plot-`.
     gs = gridspec.GridSpec(3, 1)
@@ -21,12 +21,20 @@ def plot_dataset_with_histogram(dataset, dataset_properties):
     hist_ax = plt.subplot(gs[2])
     fig.suptitle(dataset[DataCols.id])
 
-    plot_lightcurve(dataset, lightcurve_ax)
+    plot_full_lightcurve(dataset, lightcurve_ax)
+    plot_thresholds(dataset_properties, ax=lightcurve_ax)
+    lightcurve_ax.legend(loc='best')
+    for flr in flares:
+        plot_flare_markers(flr,
+                           timestamps=dataset[DataCols.time],
+                           fluxes=dataset[DataCols.flux],
+                           ax=lightcurve_ax)
+
     plot_flux_vals_hist(dataset, dataset_properties, hist_ax)
     return fig
 
 
-def plot_lightcurve(dataset, ax):
+def plot_full_lightcurve(dataset, ax):
     """
     Add a basic lightcurve errorbar-plot to a matplotlib axis
     """
@@ -53,35 +61,40 @@ def plot_flux_vals_hist(dataset, dataset_properties, ax):
 
     clipped_fluxes = get_sigma_clipped_fluxes(fluxes)
 
+    bin_centres = []
+    for bin_idx in range(len(bin_edges) - 1):
+        bin_centres.append(0.5 * (bin_edges[bin_idx] + bin_edges[bin_idx + 1]))
+    bin_centres = np.asarray(bin_centres)
 
+    bin_width = bin_edges[1] - bin_edges[0]
     # Get a mask for the histogram that only shows flux values that are inside
     # the sigma-clipped range
     # (nb len(bin_edges)==len(bins)+1)
-    clip_mask = ((bin_edges > clipped_fluxes.min()) *
-                 (bin_edges < clipped_fluxes.max()))
+    clip_mask = ((bin_centres > clipped_fluxes.min()) *
+                 (bin_centres < clipped_fluxes.max()))
     #
     # Plot the hist of all flux values, in red:
-    ax.bar(bin_edges[:-1], hist, width=bin_edges[1] - bin_edges[0],
+    ax.bar(bin_centres, hist, width=bin_width,
            color='r',
            label="All flux values")
     # The overplot the flux values that are inside the sigma-clip range,
     # using the mask
-    ax.bar(bin_edges[clip_mask],
+    ax.bar(bin_centres[clip_mask],
            hist[clip_mask],
-           width=bin_edges[1] - bin_edges[0],
+           width=bin_width,
            label="Fluxes after sigma-clipping")
 
-    xlim = np.percentile(fluxes, 0.5), np.percentile(fluxes,99.5)
+    xlim = np.percentile(fluxes, 0.5), np.percentile(fluxes, 99.5)
     ax.set_xlim(xlim)
 
     # Overplot a gaussian curve with same median and std dev as clipped data,
     # for comparison. (In yellow)
-    x=np.linspace(xlim[0], xlim[1],1000)
+    x = np.linspace(xlim[0], xlim[1], 1000)
     clip_pars_norm = scipy.stats.norm(
         dataset_properties.clipped_median,
         dataset_properties.clipped_std_dev)
     ax.plot(x, clip_pars_norm.pdf(x), color='y',
-            label = "Normal dist. for comparison")
+            label="Normal dist. for comparison")
 
     ax.set_xlabel(dataset[DataCols.flux_units])
     ax.set_ylabel("Relative prob")
@@ -89,43 +102,77 @@ def plot_flux_vals_hist(dataset, dataset_properties, ax):
     return ax
 
 
-def plot_flare(dataset, flare, ax=None):
+def plot_single_flare_lightcurve(dataset, flare, ax=None):
     if ax is None:
         ax = plt.gca()
     fluxes = dataset[DataCols.flux]
     flux_errs = dataset[DataCols.flux_err]
     timestamps = dataset[DataCols.time]
     fluxes_minus_bg = fluxes - flare.background_estimate
+    log_fluxes_minus_bg = np.log(fluxes_minus_bg)
 
-    flare_duration_idx = slice(flare.rise, flare.fall+1)
-    flare_rise_idx = slice(flare.rise, flare.peak+1)
+    ax.set_xlabel('Time [days]', fontsize=15)
+    ax.set_ylabel('Log(Flux [Jy])', fontsize=15)
+
+    flare_duration_idx = slice(flare.rise, flare.fall + 1)
+    flare_rise_idx = slice(flare.rise, flare.peak + 1)
     flare_decay_idx = slice(flare.peak, flare.fall + 1)
-    #Plot errorbars
+    # Plot errorbars
     ax.errorbar(timestamps[flare_duration_idx],
-                np.log(fluxes_minus_bg[flare_duration_idx]),
-                yerr = (flux_errs/fluxes)[flare_duration_idx],
+                log_fluxes_minus_bg[flare_duration_idx],
+                yerr=(flux_errs / fluxes)[flare_duration_idx],
                 linestyle='None',
                 )
 
-    #And rise/fall datapoints in different colours
+    # And rise/fall datapoints in different colours
     ax.scatter(timestamps[flare_rise_idx],
-               np.log(fluxes_minus_bg[flare_rise_idx]),
+               log_fluxes_minus_bg[flare_rise_idx],
                marker='o', color='Gold',
                )
     ax.scatter(timestamps[flare_decay_idx],
-               np.log(fluxes_minus_bg[flare_decay_idx]),
+               log_fluxes_minus_bg[flare_decay_idx],
                marker='o', color='Lime',
                )
 
-    #Now fitted slopes
+    plot_flare_markers(flare, timestamps, log_fluxes_minus_bg, ax)
+
+    # Now fitted slopes
     ax.plot(timestamps[flare_rise_idx],
             straight_line(timestamps[flare_rise_idx], *flare.rise_fit_pars),
-            'b-',)
+            'b-', )
     ax.plot(timestamps[flare_decay_idx],
             straight_line(timestamps[flare_decay_idx], *flare.decay_fit_pars),
             'r-', )
-
     # plt.ylim([np.log(np.percentile(fluxes, 0.5)), np.log(np.max(fluxes))])
-    ax.set_xlabel('Time [days]', fontsize=15)
-    ax.set_ylabel('Flux [Jy]', fontsize=15)
     return ax
+
+
+def plot_flare_markers(flare, timestamps, fluxes, ax):
+    # Mark the boundary points:
+    marker_colour = 'Black'
+    flare_markers = {
+        flare.rise: '^',
+        flare.trigger: 'p',
+        flare.peak: '*',
+        flare.fall: 'v'
+    }
+    for idx, marker_shape in flare_markers.items():
+        ax.plot(timestamps[idx], fluxes[idx],
+                marker=marker_shape, color=marker_colour)
+
+
+def plot_thresholds(dataset_properties, ax):
+    ax.axhline(y=dataset_properties.clipped_median,
+               label='background',
+               ls=':', c='g', lw=2)
+    low_threshold = dataset_properties.clipped_median + 1 * dataset_properties.clipped_std_dev
+    high_threshold = dataset_properties.clipped_median + 5 * dataset_properties.clipped_std_dev
+    ax.axhline(
+        y=low_threshold,
+        label='$b+1\sigma$',
+        ls='--', c='b', lw=2)
+
+    ax.axhline(
+        y=high_threshold,
+        label='$b+5\sigma$',
+        ls='--', c='r', lw=2)
