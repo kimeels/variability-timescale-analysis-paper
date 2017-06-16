@@ -3,12 +3,12 @@ from __future__ import print_function
 import logging
 
 import numpy as np
-from astropy.stats import sigma_clip
-from attr import attrib, attrs
-from attr.validators import instance_of
 from scipy.optimize import curve_fit
 
 import flarefits.ingest as ingest
+from astropy.stats import sigma_clip
+from attr import attrib, attrs
+from attr.validators import instance_of
 from flarefits.ingest import DataCols
 
 logger = logging.getLogger(__name__)
@@ -40,26 +40,21 @@ class DatasetProperties(object):
     """
     Store estimated background-level, noise-level, etc.
     """
-    median = attrib(default=None)
-    clipped_std_dev = attrib(default=None)
-    clipped_median = attrib(default=None)
+    median = attrib(instance_of(float))
+    clipped_std_dev = attrib(instance_of(float))
+    clipped_median = attrib(instance_of(float))
+    percentile10 = attrib(instance_of(float))
 
 
-def analyze_gbi(dataset):
-    times = dataset[DataCols.time]
+def calculate_dataset_properties(dataset):
     fluxes = dataset[DataCols.flux]
-    flux_errs = dataset[DataCols.flux_err]
-    data_props = DatasetProperties()
-    data_props.median = np.median(fluxes)
     clipped_fluxes = get_sigma_clipped_fluxes(fluxes)
-    data_props.clipped_median = np.ma.median(clipped_fluxes)
-    data_props.clipped_std_dev = np.ma.std(clipped_fluxes)
-
-    flares_list = find_and_fit_flares(
-        dataset,
-        background=data_props.clipped_median,
-        noise_level=data_props.clipped_std_dev)
-    return data_props, flares_list
+    return DatasetProperties(
+        median=np.median(fluxes),
+        percentile10=np.percentile(fluxes, 10.),
+        clipped_median=np.ma.median(clipped_fluxes),
+        clipped_std_dev=np.ma.std(clipped_fluxes),
+    )
 
 
 def find_and_fit_flares(dataset, background, noise_level):
@@ -277,7 +272,7 @@ def fit_flare(dataset, flare):
     return flare
 
 
-def smooth_with_window(x,window_len=24,window='flat'):
+def smooth_with_window(x, window_len=24, window='flat'):
     """
     Smooth the data using a window with requested size.
 
@@ -316,22 +311,20 @@ def smooth_with_window(x,window_len=24,window='flat'):
     if x.size < window_len:
         raise ValueError, "Input vector needs to be bigger than window size."
 
-
-    if window_len<3:
+    if window_len < 3:
         return x
-
 
     if not window in ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']:
         raise ValueError, "Window is on of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'"
 
     # Concatenate the input with half-window length reflections at either end
-    s=np.r_[x[window_len-1:0:-1],x,x[-1:-window_len:-1]]
-    #print(len(s))
-    if window == 'flat': #moving average
-        w=np.ones(window_len,'d')
+    s = np.r_[x[window_len - 1:0:-1], x, x[-1:-window_len:-1]]
+    # print(len(s))
+    if window == 'flat':  # moving average
+        w = np.ones(window_len, 'd')
     else:
-        w=eval('np.'+window+'(window_len)')
+        w = eval('np.' + window + '(window_len)')
 
-    y=np.convolve(w/w.sum(),s,mode='valid')
+    y = np.convolve(w / w.sum(), s, mode='valid')
     # Return convolution after trimming end-reflections:
-    return y[(window_len/2-1):-(window_len/2)]
+    return y[(window_len / 2 - 1):-(window_len / 2)]

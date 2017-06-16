@@ -8,11 +8,14 @@ import pprint
 import sys
 from collections import defaultdict
 
-import attr
 import matplotlib.pyplot as plt
 
+import attr
 import flarefits.ingest as ingest
-from flarefits.fitting import analyze_gbi, smooth_with_window
+from flarefits.fitting import (
+    calculate_dataset_properties, find_and_fit_flares,
+    smooth_with_window
+)
 from flarefits.ingest import DataCols, FitMethods, IndexCols
 from flarefits.plot import (
     plot_dataset_with_histogram, plot_single_flare_lightcurve
@@ -104,12 +107,20 @@ def analyze_dataset(dataset_id, dataset_filepath, data_index):
     # logger.debug("Method: {}".format(fit_method))
     if fit_method == FitMethods.gbi:
         dataset = ingest.load_gbi_dataset(dataset_filepath, dataset_id)
-        data_props, flares = analyze_gbi(dataset)
+        data_props = calculate_dataset_properties(dataset)
+        flares = find_and_fit_flares(
+            dataset,
+            background=data_props.clipped_median,
+            noise_level=data_props.clipped_std_dev)
     elif fit_method == FitMethods.gbi_smoothed:
         dataset = ingest.load_gbi_dataset(dataset_filepath, dataset_id,
                                           trim_outliers_below_percentile=3.)
         dataset[DataCols.flux] = smooth_with_window(dataset[DataCols.flux])
-        data_props, flares = analyze_gbi(dataset)
+        data_props = calculate_dataset_properties(dataset)
+        flares = find_and_fit_flares(
+            dataset,
+            background=data_props.percentile10,
+            noise_level=data_props.clipped_std_dev)
     elif fit_method in (
             FitMethods.paper,
             FitMethods.paper_smoothed):
