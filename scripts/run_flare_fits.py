@@ -141,21 +141,25 @@ def ensure_dir(dirname):
 
 def save_results(dataset_id, dataset, dataset_properties, flares, fit_method,
                  output_dir=DEFAULT_OUTPUT_DIR):
-    dataset_dir = os.path.join(output_dir, fit_method, dataset_id)
+    method_dir = os.path.join(output_dir, fit_method)
+    dataset_dir = os.path.join(method_dir, dataset_id)
     ensure_dir(dataset_dir)
     write_flares_to_json(
-        os.path.join(dataset_dir, dataset_id + '_flares.json'),
+        os.path.join(method_dir, dataset_id + '_flares.json'),
         flares)
     dataset_fig = plot_dataset_with_histogram(
-        dataset, dataset_properties, flares)
-    dataset_fig_path = os.path.join(dataset_dir,
-                                    dataset_id + '_overview.' + PLOT_FORMAT)
-    dataset_fig.savefig(dataset_fig_path)
+        dataset, dataset_properties, flares, fit_method)
+    overview_plot_filename = dataset_id + '_overview.' + PLOT_FORMAT
+    #Save 2 copies of overview plot: one in main 'method directory'
+    dataset_fig.savefig(os.path.join(method_dir,overview_plot_filename))
+    #Another in dataset directory, with the single-flare plots
+    dataset_fig.savefig(os.path.join(dataset_dir,overview_plot_filename))
     plt.close(dataset_fig)
     timestamps = dataset[DataCols.time]
     for flr_count, flr in enumerate(flares):
         ax = plot_single_flare_lightcurve(dataset, flr)
-        flare_filename = ("flare_{}_t{}_t{}." + PLOT_FORMAT).format(
+        flare_filename = ("{}_flare_{}_t{}_t{}." + PLOT_FORMAT).format(
+            dataset_id,
             flr_count,
             timestamps[flr.rise],
             timestamps[flr.fall]

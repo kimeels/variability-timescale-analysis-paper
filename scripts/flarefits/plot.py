@@ -6,12 +6,13 @@ import scipy.stats
 from matplotlib import gridspec
 
 from .fitting import get_sigma_clipped_fluxes, straight_line
-from .ingest import DataCols
+from .ingest import DataCols, FitMethods
 
 logger = logging.getLogger(__name__)
 
 
-def plot_dataset_with_histogram(dataset, dataset_properties, flares):
+def plot_dataset_with_histogram(dataset, dataset_properties,
+                                flares, fit_method):
     fig = plt.gcf()
     # Set up a 3 row plot-`.
     gs = gridspec.GridSpec(3, 1)
@@ -22,7 +23,7 @@ def plot_dataset_with_histogram(dataset, dataset_properties, flares):
     fig.suptitle(dataset[DataCols.id])
 
     plot_full_lightcurve(dataset, lightcurve_ax)
-    plot_thresholds(dataset_properties, ax=lightcurve_ax)
+    plot_thresholds(dataset_properties, fit_method, ax=lightcurve_ax)
     lightcurve_ax.legend(loc='best')
     for flr in flares:
         plot_flare_markers(flr,
@@ -158,15 +159,21 @@ def plot_flare_markers(flare, timestamps, fluxes, ax):
     }
     for idx, marker_shape in flare_markers.items():
         ax.plot(timestamps[idx], fluxes[idx],
-                marker=marker_shape, color=marker_colour)
+                marker=marker_shape,
+                color=marker_colour,
+                zorder=10)
 
 
-def plot_thresholds(dataset_properties, ax):
-    ax.axhline(y=dataset_properties.clipped_median,
+def plot_thresholds(dataset_properties, fit_method, ax):
+    if fit_method == FitMethods.gbi:
+        background = dataset_properties.clipped_median
+    elif fit_method == FitMethods.gbi_smoothed:
+        background = dataset_properties.percentile10
+    low_threshold = background + 1 * dataset_properties.clipped_std_dev
+    high_threshold = background + 5 * dataset_properties.clipped_std_dev
+    ax.axhline(y=background,
                label='background',
                ls=':', c='g', lw=2)
-    low_threshold = dataset_properties.clipped_median + 1 * dataset_properties.clipped_std_dev
-    high_threshold = dataset_properties.clipped_median + 5 * dataset_properties.clipped_std_dev
     ax.axhline(
         y=low_threshold,
         label='$b+1\sigma$',
