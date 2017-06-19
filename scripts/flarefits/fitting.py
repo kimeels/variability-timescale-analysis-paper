@@ -3,12 +3,12 @@ from __future__ import print_function
 import logging
 
 import numpy as np
-from scipy.optimize import curve_fit
-
-import flarefits.ingest as ingest
 from astropy.stats import sigma_clip
 from attr import attrib, attrs
 from attr.validators import instance_of
+from scipy.optimize import curve_fit
+
+import flarefits.ingest as ingest
 from flarefits.ingest import DataCols
 
 logger = logging.getLogger(__name__)
@@ -34,27 +34,6 @@ class Flare(object):
     rise_fit_pars = attrib(default=None)
     decay_fit_pars = attrib(default=None)
 
-
-@attrs
-class DatasetProperties(object):
-    """
-    Store estimated background-level, noise-level, etc.
-    """
-    median = attrib(instance_of(float))
-    clipped_std_dev = attrib(instance_of(float))
-    clipped_median = attrib(instance_of(float))
-    percentile10 = attrib(instance_of(float))
-
-
-def calculate_dataset_properties(dataset):
-    fluxes = dataset[DataCols.flux]
-    clipped_fluxes = get_sigma_clipped_fluxes(fluxes)
-    return DatasetProperties(
-        median=np.median(fluxes),
-        percentile10=np.percentile(fluxes, 10.),
-        clipped_median=np.ma.median(clipped_fluxes),
-        clipped_std_dev=np.ma.std(clipped_fluxes),
-    )
 
 
 def find_and_fit_flares(dataset, background, noise_level):
@@ -251,8 +230,8 @@ def fit_flare(dataset, flare):
         flare.rise_fit_pars = rise_par.tolist()
 
     except Exception as e:
-        print("Rise fit failed:")
-        print(e)
+        logger.exception("Rise fit failed:")
+
         pass
 
     # Fit decline section
@@ -266,8 +245,7 @@ def fit_flare(dataset, flare):
         flare.decay_slope_err = fall_par_err[0]
         flare.decay_fit_pars = fall_par.tolist()
     except Exception as e:
-        print("fall fit failed:")
-        print(e)
+        logger.exception("Fall fit failed:")
         pass
     return flare
 

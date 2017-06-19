@@ -8,17 +8,22 @@ import pprint
 import sys
 from collections import defaultdict
 
-import matplotlib.pyplot as plt
-
 import attr
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib import gridspec
+
 import flarefits.ingest as ingest
 from flarefits.fitting import (
-    calculate_dataset_properties, find_and_fit_flares,
+    Flare, find_and_fit_flares, fit_flare, get_sigma_clipped_fluxes,
     smooth_with_window
 )
-from flarefits.ingest import DataCols, FitMethods, IndexCols
+from flarefits.ingest import (
+    DataCols, FitMethods, IndexCols, trim_outliers_below_percentile
+)
 from flarefits.plot import (
-    plot_dataset_with_histogram, plot_single_flare_lightcurve
+    plot_lightcurve_with_flares, plot_sigma_clipping_hist,
+    plot_single_flare_lightcurve, plot_thresholds
 )
 
 logging.basicConfig(
@@ -100,35 +105,58 @@ def analyze_dataset(dataset_id, dataset_filepath, data_index):
     For each data file, check the index and run the corresponding analysis.
     """
     fit_method = data_index[dataset_id][IndexCols.fit_method]
-    logger.info("Analyzing dataset {}, fit method {}".format(
-        dataset_id, fit_method))
+    logger.info("Analyzing dataset {}, fit method {}, from path {}".format(
+        dataset_id, fit_method, dataset_filepath))
     logger.debug("(Path: {}".format(dataset_filepath))
-
     # logger.debug("Method: {}".format(fit_method))
+    dataset = ingest.load_dataset(dataset_filepath, dataset_id, fit_method)
+    fluxes = dataset[DataCols.flux]
+
     if fit_method == FitMethods.gbi:
-        dataset = ingest.load_gbi_dataset(dataset_filepath, dataset_id)
-        data_props = calculate_dataset_properties(dataset)
+        clipped_fluxes = get_sigma_clipped_fluxes(dataset[DataCols.flux])
+        background_estimate = np.ma.median(clipped_fluxes)
+        noise_estimate = np.ma.std(clipped_fluxes)
         flares = find_and_fit_flares(
             dataset,
-            background=data_props.clipped_median,
-            noise_level=data_props.clipped_std_dev)
+            background=background_estimate,
+            noise_level=noise_estimate)
     elif fit_method == FitMethods.gbi_smoothed:
-        dataset = ingest.load_gbi_dataset(dataset_filepath, dataset_id,
-                                          trim_outliers_below_percentile=3.)
         dataset[DataCols.flux] = smooth_with_window(dataset[DataCols.flux])
-        data_props = calculate_dataset_properties(dataset)
+        trim_outliers_below_percentile(dataset, 3.)
+        clipped_fluxes = get_sigma_clipped_fluxes(fluxes)
+        background_estimate = np.percentile(fluxes, 10.)
+        noise_estimate = np.ma.std(clipped_fluxes)
         flares = find_and_fit_flares(
             dataset,
-            background=data_props.percentile10,
-            noise_level=data_props.clipped_std_dev)
-    elif fit_method in (
-            FitMethods.paper,
-            FitMethods.paper_smoothed):
-        # Fixme
-        return None
+            background=background_estimate,
+            noise_level=noise_estimate)
+    elif fit_method == FitMethods.paper:
+        background_estimate = np.percentile(fluxes, 10.)
+        noise_estimate = np.mean(dataset[DataCols.flux_err])
+        flares = find_and_fit_flares(
+            dataset,
+            background=background_estimate,
+            noise_level=noise_estimate
+        )
+
+    elif fit_method == FitMethods.paper_single_flare:
+        # Single visually identified flare
+        single_flare= Flare(rise=0, trigger=0,
+                            peak = np.argmax(fluxes),
+                            fall=len(fluxes)-1
+                            )
+        flares = [single_flare,]
+        fit_flare(dataset, single_flare)
+        # Just use these for plots
+        background_estimate = np.min(fluxes)
+        noise_estimate = 0.
     else:
         raise ValueError("Unknown fit method: {}".format(fit_method))
-    save_results(dataset_id, dataset, data_props, flares, fit_method)
+
+    save_results(dataset_id, dataset, flares,
+                 background_estimate=background_estimate,
+                 noise_estimate=noise_estimate,
+                 fit_method=fit_method)
 
 
 def ensure_dir(dirname):
@@ -139,22 +167,57 @@ def ensure_dir(dirname):
         raise RuntimeError("Path exists but is not directory: \n" + dirname)
 
 
-def save_results(dataset_id, dataset, dataset_properties, flares, fit_method,
+def save_results(dataset_id, dataset, flares,
+                 background_estimate, noise_estimate,
+                 fit_method,
                  output_dir=DEFAULT_OUTPUT_DIR):
+    """
+    Write flares to JSON and output plots
+    """
+
     method_dir = os.path.join(output_dir, fit_method)
     dataset_dir = os.path.join(method_dir, dataset_id)
     ensure_dir(dataset_dir)
     write_flares_to_json(
         os.path.join(method_dir, dataset_id + '_flares.json'),
         flares)
-    dataset_fig = plot_dataset_with_histogram(
-        dataset, dataset_properties, flares, fit_method)
+
+    fig = plt.gcf()
+    fig.suptitle(dataset[DataCols.id])
+    # Set up a 3 row plot-`.
+    gs = gridspec.GridSpec(3, 1)
+    # Use the top 2/3rds for the lightcurve axis
+    lightcurve_ax = plt.subplot(gs[:2])
+    # Use the bottom 1/3rd for the histogram axis
+    hist_ax = plt.subplot(gs[2])
+
+    if fit_method == FitMethods.gbi:
+        plot_sigma_clipping_hist(dataset, ax=hist_ax)
+    elif fit_method in (FitMethods.gbi_smoothed, FitMethods.paper):
+        hist_ax.hist(dataset[DataCols.flux],normed=True)
+        hist_ax.set_xlabel(dataset[DataCols.flux_units])
+        hist_ax.set_ylabel("Relative prob")
+    elif fit_method== FitMethods.paper_single_flare:
+        # Don't bother with a histogram plot if we're looking at a preselected
+        # flare.
+        lightcurve_ax = plt.subplot(gs[:])
+
+    plot_lightcurve_with_flares(dataset, flares, ax=lightcurve_ax)
+    plot_thresholds(
+        background=background_estimate,
+        low_threshold=background_estimate + 1 * noise_estimate,
+        high_threshold=background_estimate + 5 * noise_estimate,
+        ax=lightcurve_ax,
+    )
+    lightcurve_ax.legend(loc='best')
+
+
     overview_plot_filename = dataset_id + '_overview.' + PLOT_FORMAT
-    #Save 2 copies of overview plot: one in main 'method directory'
-    dataset_fig.savefig(os.path.join(method_dir,overview_plot_filename))
-    #Another in dataset directory, with the single-flare plots
-    dataset_fig.savefig(os.path.join(dataset_dir,overview_plot_filename))
-    plt.close(dataset_fig)
+    # Save 2 copies of overview plot: one in main 'method directory'
+    fig.savefig(os.path.join(method_dir, overview_plot_filename))
+    # Another in dataset directory, with the single-flare plots
+    fig.savefig(os.path.join(dataset_dir, overview_plot_filename))
+    plt.close(fig)
     timestamps = dataset[DataCols.time]
     for flr_count, flr in enumerate(flares):
         ax = plot_single_flare_lightcurve(dataset, flr)
