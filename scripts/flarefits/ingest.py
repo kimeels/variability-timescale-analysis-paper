@@ -188,7 +188,7 @@ def read_gbi_datafile(path):
     logger.debug("Reading: " + path)
     with open(path) as f:
         rdr = csv.reader(f,
-                         delimiter=' ',
+                         delimiter='\t',
                          skipinitialspace=True,
                          quoting=csv.QUOTE_NONNUMERIC)
         datarows = [row for row in rdr if len(row)]
