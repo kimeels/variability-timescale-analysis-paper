@@ -141,15 +141,15 @@ def analyze_dataset(dataset_id, dataset_filepath, data_index):
 
     elif fit_method == FitMethods.paper_single_flare:
         # Single visually identified flare
-        single_flare= Flare(rise=0, trigger=0,
-                            peak = np.argmax(fluxes),
-                            fall=len(fluxes)-1
-                            )
-        flares = [single_flare,]
+        single_flare = Flare(rise=0, trigger=0,
+                             peak=np.argmax(fluxes),
+                             fall=len(fluxes) - 1
+                             )
+        flares = [single_flare, ]
         fit_flare(dataset, single_flare)
-        # Just use these for plots
-        background_estimate = np.min(fluxes)
-        noise_estimate = 0.
+        # Dummy values, passed to plotting routines:
+        background_estimate = None
+        noise_estimate = None
     else:
         raise ValueError("Unknown fit method: {}".format(fit_method))
 
@@ -194,23 +194,23 @@ def save_results(dataset_id, dataset, flares,
     if fit_method == FitMethods.gbi:
         plot_sigma_clipping_hist(dataset, ax=hist_ax)
     elif fit_method in (FitMethods.gbi_smoothed, FitMethods.paper):
-        hist_ax.hist(dataset[DataCols.flux],normed=True)
+        hist_ax.hist(dataset[DataCols.flux], normed=True)
         hist_ax.set_xlabel(dataset[DataCols.flux_units])
         hist_ax.set_ylabel("Relative prob")
-    elif fit_method== FitMethods.paper_single_flare:
+    elif fit_method == FitMethods.paper_single_flare:
         # Don't bother with a histogram plot if we're looking at a preselected
         # flare.
         lightcurve_ax = plt.subplot(gs[:])
 
     plot_lightcurve_with_flares(dataset, flares, ax=lightcurve_ax)
-    plot_thresholds(
-        background=background_estimate,
-        low_threshold=background_estimate + 1 * noise_estimate,
-        high_threshold=background_estimate + 5 * noise_estimate,
-        ax=lightcurve_ax,
-    )
+    if fit_method != FitMethods.paper_single_flare:
+        plot_thresholds(
+            background=background_estimate,
+            low_threshold=background_estimate + 1 * noise_estimate,
+            high_threshold=background_estimate + 5 * noise_estimate,
+            ax=lightcurve_ax,
+        )
     lightcurve_ax.legend(loc='best')
-
 
     overview_plot_filename = dataset_id + '_overview.' + PLOT_FORMAT
     # Save 2 copies of overview plot: one in main 'method directory'
