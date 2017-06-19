@@ -14,7 +14,7 @@ class FitMethods:
     # Long-duration flares in GBI data
     # Occasional noisy outliers disrupt the fits and noise estimation
     # So we smooth the data and use the 10th percentile as a background estimate:
-    gbi_smoothed = "GBI-s"
+    gbi_single_flare = "GBI-s"
 
     # Flares from the literature
     # Often these are pre-selected data, meaning it is difficult to perform
@@ -254,7 +254,7 @@ def load_dataset(datafile_abspath, dataset_id, fit_method):
         dict: See ``DataCols`` class.
     """
 
-    if fit_method in (FitMethods.gbi, FitMethods.gbi_smoothed):
+    if fit_method in (FitMethods.gbi, FitMethods.gbi_single_flare):
         raw_dataset = read_gbi_datafile(datafile_abspath)
         dataset = standardize_gbi_dataset(raw_dataset)
     elif fit_method in (FitMethods.paper, FitMethods.paper_single_flare):

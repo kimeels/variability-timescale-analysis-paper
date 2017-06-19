@@ -120,7 +120,7 @@ def analyze_dataset(dataset_id, dataset_filepath, data_index):
             dataset,
             background=background_estimate,
             noise_level=noise_estimate)
-    elif fit_method == FitMethods.gbi_smoothed:
+    elif fit_method == FitMethods.gbi_single_flare:
         dataset[DataCols.flux] = smooth_with_window(dataset[DataCols.flux])
         trim_outliers_below_percentile(dataset, 3.)
         clipped_fluxes = get_sigma_clipped_fluxes(fluxes)
@@ -193,7 +193,7 @@ def save_results(dataset_id, dataset, flares,
 
     if fit_method == FitMethods.gbi:
         plot_sigma_clipping_hist(dataset, ax=hist_ax)
-    elif fit_method in (FitMethods.gbi_smoothed, FitMethods.paper):
+    elif fit_method in (FitMethods.gbi_single_flare, FitMethods.paper):
         hist_ax.hist(dataset[DataCols.flux], normed=True)
         hist_ax.set_xlabel(dataset[DataCols.flux_units])
         hist_ax.set_ylabel("Relative prob")
