@@ -229,8 +229,7 @@ def standardize_gbi_dataset(raw_dataset):
     return raw_dataset
 
 
-def load_dataset(datafile_abspath, dataset_id, fit_method,
-                 trim_outliers_below_percentile=None):
+def load_dataset(datafile_abspath, dataset_id, fit_method):
     """
     Load a dataset.
 
@@ -258,12 +257,12 @@ def load_dataset(datafile_abspath, dataset_id, fit_method,
     elif fit_method in (FitMethods.paper, FitMethods.paper_smoothed):
         raw_dataset = read_paper_datafile(datafile_abspath)
         dataset = standardize_paper_dataset(raw_dataset)
-    if trim_outliers_below_percentile is not None:
-        low_val_outlier_threshold = np.percentile(dataset[DataCols.flux],
-                                                  trim_outliers_below_percentile)
-        good_data_idx = dataset[DataCols.flux] > low_val_outlier_threshold
-        for col in (DataCols.time, DataCols.flux, DataCols.flux_err,):
-            dataset[col] = dataset[col][good_data_idx]
-
     dataset[DataCols.id] = dataset_id
     return dataset
+
+def trim_outliers_below_percentile(dataset, percentile):
+    low_val_outlier_threshold = np.percentile(dataset[DataCols.flux],
+                                              percentile)
+    good_data_idx = dataset[DataCols.flux] > low_val_outlier_threshold
+    for col in (DataCols.time, DataCols.flux, DataCols.flux_err,):
+        dataset[col] = dataset[col][good_data_idx]

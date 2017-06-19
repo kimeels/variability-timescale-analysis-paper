@@ -16,7 +16,9 @@ from flarefits.fitting import (
     calculate_dataset_properties, find_and_fit_flares,
     smooth_with_window
 )
-from flarefits.ingest import DataCols, FitMethods, IndexCols
+from flarefits.ingest import (
+    DataCols, FitMethods, IndexCols, trim_outliers_below_percentile
+)
 from flarefits.plot import (
     plot_dataset_with_histogram, plot_single_flare_lightcurve
 )
@@ -112,9 +114,9 @@ def analyze_dataset(dataset_id, dataset_filepath, data_index):
             background=data_props.clipped_median,
             noise_level=data_props.clipped_std_dev)
     elif fit_method == FitMethods.gbi_smoothed:
-        dataset = ingest.load_dataset(dataset_filepath, dataset_id, fit_method,
-                                      trim_outliers_below_percentile=3.)
+        dataset = ingest.load_dataset(dataset_filepath, dataset_id, fit_method)
         dataset[DataCols.flux] = smooth_with_window(dataset[DataCols.flux])
+        trim_outliers_below_percentile(dataset, 3.)
         data_props = calculate_dataset_properties(dataset)
         flares = find_and_fit_flares(
             dataset,
@@ -152,10 +154,10 @@ def save_results(dataset_id, dataset, dataset_properties, flares, fit_method,
     dataset_fig = plot_dataset_with_histogram(
         dataset, dataset_properties, flares, fit_method)
     overview_plot_filename = dataset_id + '_overview.' + PLOT_FORMAT
-    #Save 2 copies of overview plot: one in main 'method directory'
-    dataset_fig.savefig(os.path.join(method_dir,overview_plot_filename))
-    #Another in dataset directory, with the single-flare plots
-    dataset_fig.savefig(os.path.join(dataset_dir,overview_plot_filename))
+    # Save 2 copies of overview plot: one in main 'method directory'
+    dataset_fig.savefig(os.path.join(method_dir, overview_plot_filename))
+    # Another in dataset directory, with the single-flare plots
+    dataset_fig.savefig(os.path.join(dataset_dir, overview_plot_filename))
     plt.close(dataset_fig)
     timestamps = dataset[DataCols.time]
     for flr_count, flr in enumerate(flares):
