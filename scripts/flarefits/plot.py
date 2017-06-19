@@ -6,36 +6,24 @@ import scipy.stats
 from matplotlib import gridspec
 
 from .fitting import get_sigma_clipped_fluxes, straight_line
-from .ingest import DataCols, FitMethods
+from .ingest import DataCols
 
 logger = logging.getLogger(__name__)
 
 
-def plot_dataset_with_histogram(dataset, dataset_properties,
-                                flares, fit_method):
-    fig = plt.gcf()
-    # Set up a 3 row plot-`.
-    gs = gridspec.GridSpec(3, 1)
-    # Use the top 2/3rds for the lightcurve axis
-    lightcurve_ax = plt.subplot(gs[:2])
-    # Use the bottom 1/3rd for the histogram axis
-    hist_ax = plt.subplot(gs[2])
-    fig.suptitle(dataset[DataCols.id])
-
-    plot_full_lightcurve(dataset, lightcurve_ax)
-    plot_thresholds(dataset_properties, fit_method, ax=lightcurve_ax)
-    lightcurve_ax.legend(loc='best')
+def plot_lightcurve_with_flares(dataset, flares,  ax=None):
+    if ax is None:
+        ax = plt.gca()
+    plot_lightcurve(dataset, ax)
     for flr in flares:
         plot_flare_markers(flr,
                            timestamps=dataset[DataCols.time],
                            fluxes=dataset[DataCols.flux],
-                           ax=lightcurve_ax)
-
-    plot_flux_vals_hist(dataset, dataset_properties, hist_ax)
-    return fig
+                           ax=ax)
+    return ax
 
 
-def plot_full_lightcurve(dataset, ax):
+def plot_lightcurve(dataset, ax):
     """
     Add a basic lightcurve errorbar-plot to a matplotlib axis
     """
@@ -48,11 +36,11 @@ def plot_full_lightcurve(dataset, ax):
     return ax
 
 
-def plot_flux_vals_hist(dataset, dataset_properties, ax):
+def plot_sigma_clipping_hist(dataset, ax):
     """
     Plot bi-color histogram highlighting data-range masked by sigma-clipping.
 
-    Overplot gaussian PDF matched to mean, std. dev of sigma-clipped data.
+    Overplot gaussian PDF matched to median, std. dev of sigma-clipped data.
     """
 
     fluxes = dataset[DataCols.flux]
@@ -92,8 +80,9 @@ def plot_flux_vals_hist(dataset, dataset_properties, ax):
     # for comparison. (In yellow)
     x = np.linspace(xlim[0], xlim[1], 1000)
     clip_pars_norm = scipy.stats.norm(
-        dataset_properties.clipped_median,
-        dataset_properties.clipped_std_dev)
+        np.ma.median(clipped_fluxes),
+        np.ma.std(clipped_fluxes),
+    )
     ax.plot(x, clip_pars_norm.pdf(x), color='y',
             label="Normal dist. for comparison")
 
@@ -138,12 +127,14 @@ def plot_single_flare_lightcurve(dataset, flare, ax=None):
     plot_flare_markers(flare, timestamps, log_fluxes_minus_bg, ax)
 
     # Now fitted slopes
-    ax.plot(timestamps[flare_rise_idx],
-            straight_line(timestamps[flare_rise_idx], *flare.rise_fit_pars),
-            'b-', )
-    ax.plot(timestamps[flare_decay_idx],
-            straight_line(timestamps[flare_decay_idx], *flare.decay_fit_pars),
-            'r-', )
+    if flare.rise_slope is not None:
+        ax.plot(timestamps[flare_rise_idx],
+                straight_line(timestamps[flare_rise_idx], *flare.rise_fit_pars),
+                'b-', )
+    if flare.decay_slope is not None:
+        ax.plot(timestamps[flare_decay_idx],
+                straight_line(timestamps[flare_decay_idx], *flare.decay_fit_pars),
+                'r-', )
     # plt.ylim([np.log(np.percentile(fluxes, 0.5)), np.log(np.max(fluxes))])
     return ax
 
@@ -164,13 +155,7 @@ def plot_flare_markers(flare, timestamps, fluxes, ax):
                 zorder=10)
 
 
-def plot_thresholds(dataset_properties, fit_method, ax):
-    if fit_method == FitMethods.gbi:
-        background = dataset_properties.clipped_median
-    elif fit_method == FitMethods.gbi_smoothed:
-        background = dataset_properties.percentile10
-    low_threshold = background + 1 * dataset_properties.clipped_std_dev
-    high_threshold = background + 5 * dataset_properties.clipped_std_dev
+def plot_thresholds(background, low_threshold, high_threshold, ax):
     ax.axhline(y=background,
                label='background',
                ls=':', c='g', lw=2)

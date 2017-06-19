@@ -24,7 +24,10 @@ class FitMethods:
     # and take the mean flux-error as our 'sigma' for determining
     # flare-detection thresholds.
     paper = "Papers-m"
-    paper_smoothed = "Papers-s"
+
+    # For some visually identified datasets,
+    # we simply treat the lightcurve as a single flare
+    paper_single_flare = "Papers-s"
 
 
 class IndexCols:
@@ -254,7 +257,7 @@ def load_dataset(datafile_abspath, dataset_id, fit_method):
     if fit_method in (FitMethods.gbi, FitMethods.gbi_smoothed):
         raw_dataset = read_gbi_datafile(datafile_abspath)
         dataset = standardize_gbi_dataset(raw_dataset)
-    elif fit_method in (FitMethods.paper, FitMethods.paper_smoothed):
+    elif fit_method in (FitMethods.paper, FitMethods.paper_single_flare):
         raw_dataset = read_paper_datafile(datafile_abspath)
         dataset = standardize_paper_dataset(raw_dataset)
     dataset[DataCols.id] = dataset_id
