@@ -3,12 +3,12 @@ from __future__ import print_function
 import logging
 
 import numpy as np
-from scipy.optimize import curve_fit
-
-import flarefits.ingest as ingest
 from astropy.stats import sigma_clip
 from attr import attrib, attrs
 from attr.validators import instance_of
+from scipy.optimize import curve_fit
+
+import flarefits.ingest as ingest
 from flarefits.ingest import DataCols
 
 logger = logging.getLogger(__name__)

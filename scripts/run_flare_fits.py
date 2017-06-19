@@ -8,9 +8,9 @@ import pprint
 import sys
 from collections import defaultdict
 
+import attr
 import matplotlib.pyplot as plt
 
-import attr
 import flarefits.ingest as ingest
 from flarefits.fitting import (
     calculate_dataset_properties, find_and_fit_flares,
@@ -100,31 +100,33 @@ def analyze_dataset(dataset_id, dataset_filepath, data_index):
     For each data file, check the index and run the corresponding analysis.
     """
     fit_method = data_index[dataset_id][IndexCols.fit_method]
-    logger.info("Analyzing dataset {}, fit method {}".format(
-        dataset_id, fit_method))
+    logger.info("Analyzing dataset {}, fit method {}, from path {}".format(
+        dataset_id, fit_method, dataset_filepath))
     logger.debug("(Path: {}".format(dataset_filepath))
-
     # logger.debug("Method: {}".format(fit_method))
     if fit_method == FitMethods.gbi:
-        dataset = ingest.load_gbi_dataset(dataset_filepath, dataset_id)
+        dataset = ingest.load_dataset(dataset_filepath, dataset_id, fit_method)
         data_props = calculate_dataset_properties(dataset)
         flares = find_and_fit_flares(
             dataset,
             background=data_props.clipped_median,
             noise_level=data_props.clipped_std_dev)
     elif fit_method == FitMethods.gbi_smoothed:
-        dataset = ingest.load_gbi_dataset(dataset_filepath, dataset_id,
-                                          trim_outliers_below_percentile=3.)
+        dataset = ingest.load_dataset(dataset_filepath, dataset_id, fit_method,
+                                      trim_outliers_below_percentile=3.)
         dataset[DataCols.flux] = smooth_with_window(dataset[DataCols.flux])
         data_props = calculate_dataset_properties(dataset)
         flares = find_and_fit_flares(
             dataset,
             background=data_props.percentile10,
             noise_level=data_props.clipped_std_dev)
-    elif fit_method in (
-            FitMethods.paper,
-            FitMethods.paper_smoothed):
-        # Fixme
+    elif fit_method == FitMethods.paper:
+        dataset = ingest.load_dataset(dataset_filepath, dataset_id, fit_method)
+        data_props = calculate_dataset_properties(dataset)
+        return None
+    elif fit_method == FitMethods.paper_smoothed:
+        dataset = ingest.load_dataset(dataset_filepath, dataset_id, fit_method)
+        data_props = calculate_dataset_properties(dataset)
         return None
     else:
         raise ValueError("Unknown fit method: {}".format(fit_method))
