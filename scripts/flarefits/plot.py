@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats
 from matplotlib import gridspec
+from astropy.stats import median_absolute_deviation
 
 from .fitting import get_sigma_clipped_fluxes, straight_line
 from .ingest import DataCols
@@ -81,7 +82,8 @@ def plot_sigma_clipping_hist(dataset, ax):
     x = np.linspace(xlim[0], xlim[1], 1000)
     clip_pars_norm = scipy.stats.norm(
         np.ma.median(clipped_fluxes),
-        np.ma.std(clipped_fluxes),
+        #np.ma.std(clipped_fluxes),
+        median_absolute_deviation(clipped_fluxes)
     )
     ax.plot(x, clip_pars_norm.pdf(x), color='y',
             label="Normal dist. for comparison")

@@ -7,6 +7,7 @@ from astropy.stats import sigma_clip
 from attr import attrib, attrs
 from attr.validators import instance_of
 from scipy.optimize import curve_fit
+from astropy.stats import median_absolute_deviation
 
 import flarefits.ingest as ingest
 from flarefits.ingest import DataCols
@@ -58,13 +59,13 @@ def get_sigma_clipped_fluxes(raw_fluxes):
 
     # First we try to run sigma clip with the defaults - hopefully this will
     # iterate until it converges:
-    clipped_fluxes = sigma_clip(raw_fluxes, iters=None)
+    clipped_fluxes = sigma_clip(raw_fluxes, iters=None, stdfunc=median_absolute_deviation)
     # If it fails (number of unmasked values <3),
     # then we just accept the result from a single iteration:
     if len(clipped_fluxes.compressed()) < 3:
         logger.warning("Sigma clipping did not converge, "
                        "using single iteration")
-        clipped_fluxes = sigma_clip(raw_fluxes, iters=1)
+        clipped_fluxes = sigma_clip(raw_fluxes, iters=1, stdfunc=median_absolute_deviation)
     return clipped_fluxes
 
 
@@ -250,7 +251,7 @@ def fit_flare(dataset, flare):
     return flare
 
 
-def smooth_with_window(x, window_len=24, window='flat'):
+def smooth_with_window(x, window_len=22, window='flat'):
     """
     Smooth the data using a window with requested size.
 

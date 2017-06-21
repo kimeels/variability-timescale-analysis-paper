@@ -12,6 +12,7 @@ import attr
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import gridspec
+from astropy.stats import median_absolute_deviation
 
 import flarefits.ingest as ingest
 from flarefits.fitting import (
@@ -115,23 +116,21 @@ def analyze_dataset(dataset_id, dataset_filepath, data_index):
     if fit_method == FitMethods.gbi:
         clipped_fluxes = get_sigma_clipped_fluxes(dataset[DataCols.flux])
         background_estimate = np.ma.median(clipped_fluxes)
-        noise_estimate = np.ma.std(clipped_fluxes)
+        noise_estimate = median_absolute_deviation(clipped_fluxes)
         flares = find_and_fit_flares(
             dataset,
             background=background_estimate,
             noise_level=noise_estimate)
     elif fit_method == FitMethods.gbi_single_flare:
         dataset[DataCols.flux] = smooth_with_window(dataset[DataCols.flux])
-        trim_outliers_below_percentile(dataset, 3.)
-        clipped_fluxes = get_sigma_clipped_fluxes(fluxes)
-        background_estimate = np.percentile(fluxes, 10.)
-        noise_estimate = np.ma.std(clipped_fluxes)
+        background_estimate = np.percentile(fluxes, 15.)
+        noise_estimate = np.mean(dataset[DataCols.flux_err])
         flares = find_and_fit_flares(
             dataset,
             background=background_estimate,
             noise_level=noise_estimate)
     elif fit_method == FitMethods.paper:
-        background_estimate = np.percentile(fluxes, 10.)
+        background_estimate = np.percentile(fluxes, 15.)
         noise_estimate = np.mean(dataset[DataCols.flux_err])
         flares = find_and_fit_flares(
             dataset,
