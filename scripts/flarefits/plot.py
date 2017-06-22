@@ -106,9 +106,9 @@ def plot_single_flare_lightcurve(dataset, flare, ax=None):
     ax.set_xlabel('Time [days]', fontsize=15)
     ax.set_ylabel('Log(Flux [Jy])', fontsize=15)
 
-    flare_duration_idx = slice(flare.rise, flare.fall + 1)
-    flare_rise_idx = slice(flare.rise, flare.peak + 1)
-    flare_decay_idx = slice(flare.peak, flare.fall + 1)
+    flare_duration_idx = slice(flare.rise_idx, flare.fall_idx + 1)
+    flare_rise_idx = slice(flare.rise_idx, flare.peak_idx + 1)
+    flare_decay_idx = slice(flare.peak_idx, flare.fall_idx + 1)
     # Plot errorbars
     ax.errorbar(timestamps[flare_duration_idx],
                 log_fluxes_minus_bg[flare_duration_idx],
@@ -145,10 +145,10 @@ def plot_flare_markers(flare, timestamps, fluxes, ax):
     # Mark the boundary points:
     marker_colour = 'Black'
     flare_markers = {
-        flare.rise: '^',
-        flare.trigger: 'p',
-        flare.peak: '*',
-        flare.fall: 'v'
+        flare.rise_idx: '^',
+        flare.trigger_idx: 'p',
+        flare.peak_idx: '*',
+        flare.fall_idx: 'v'
     }
     for idx, marker_shape in flare_markers.items():
         ax.plot(timestamps[idx], fluxes[idx],

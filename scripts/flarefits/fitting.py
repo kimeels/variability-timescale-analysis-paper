@@ -23,10 +23,11 @@ class Flare(object):
     Holds array-indices marking flare boundaries.
     Stores results from fitting rise and decay slopes of a flare.
     """
-    trigger = attrib(instance_of(int))
-    rise = attrib(instance_of(int))
-    peak = attrib(instance_of(int))
-    fall = attrib(instance_of(int))
+    trigger_idx = attrib(instance_of(int))
+    rise_idx = attrib(instance_of(int))
+    peak_idx = attrib(instance_of(int))
+    fall_idx = attrib(instance_of(int))
+    peak_flux = attrib(instance_of(float))
     rise_slope = attrib(default=None)
     rise_slope_err = attrib(default=None)
     decay_slope = attrib(default=None)
@@ -34,7 +35,8 @@ class Flare(object):
     background_estimate = attrib(default=None)
     rise_fit_pars = attrib(default=None)
     decay_fit_pars = attrib(default=None)
-
+    rise_reduced_chi_sq = attrib(default=None)
+    decay_reduced_chi_sq = attrib(default=None)
 
 
 def find_and_fit_flares(dataset, background, noise_level):
@@ -59,13 +61,15 @@ def get_sigma_clipped_fluxes(raw_fluxes):
 
     # First we try to run sigma clip with the defaults - hopefully this will
     # iterate until it converges:
-    clipped_fluxes = sigma_clip(raw_fluxes, iters=None, stdfunc=median_absolute_deviation)
+    clipped_fluxes = sigma_clip(raw_fluxes, iters=None,
+                                stdfunc=median_absolute_deviation)
     # If it fails (number of unmasked values <3),
     # then we just accept the result from a single iteration:
     if len(clipped_fluxes.compressed()) < 3:
         logger.warning("Sigma clipping did not converge, "
                        "using single iteration")
-        clipped_fluxes = sigma_clip(raw_fluxes, iters=1, stdfunc=median_absolute_deviation)
+        clipped_fluxes = sigma_clip(raw_fluxes, iters=1,
+                                    stdfunc=median_absolute_deviation)
     return clipped_fluxes
 
 
@@ -138,10 +142,11 @@ def find_flares(dataset, background, noise_level):
             peak_val = masked.max()
             peak_idx = np.where(masked == peak_val)[0]
             rise = find_rise_start(trigger)
-            flare = Flare(trigger=trigger,
-                          rise=rise,
-                          peak=peak_idx[0],
-                          fall=fall)
+            flare = Flare(trigger_idx=trigger,
+                          rise_idx=rise,
+                          peak_idx=peak_idx[0],
+                          fall_idx=fall,
+                          peak_flux=peak_val)
             flare_list.append(flare)
     return flare_list
 
@@ -171,6 +176,19 @@ def fit_simple_exponential(timestamps, fluxes, flux_errors):
     return param, param_err
 
 
+def calculate_reduced_chi_squared(timestamps, fluxes, flux_errs, fit_pars):
+    # NB fluxes should already be background adjusted and trimmed to remove
+    # any non-positive values.
+    model = straight_line(timestamps, *fit_pars)
+    data = np.log(fluxes)
+    log_errors_sq = (flux_errs / fluxes) ** 2
+    chi2_array = ((data - model) ** 2) / log_errors_sq
+    deg_of_freedom = len(timestamps) - 2.0 - 1.0
+    chi2 = chi2_array.sum()
+    reduced_chi2 = chi2 / deg_of_freedom
+    return reduced_chi2
+
+
 def fit_flare_section(dataset, start_idx, end_idx, background_flux):
     """
     Extract the relevant slice of data, subtract background flux, fit.
@@ -196,9 +214,16 @@ def fit_flare_section(dataset, start_idx, end_idx, background_flux):
     flux_trimmed = flux_section[good_data_idx]
     err_trimmed = flux_err_section[good_data_idx]
     timestamp_trimmed = timestamp_section[good_data_idx]
-    return fit_simple_exponential(timestamps=timestamp_trimmed,
-                                  fluxes=flux_trimmed,
-                                  flux_errors=err_trimmed)
+    param, param_err = fit_simple_exponential(timestamps=timestamp_trimmed,
+                                              fluxes=flux_trimmed,
+                                              flux_errors=err_trimmed)
+    reduced_chi_sq = calculate_reduced_chi_squared(
+        timestamps=timestamp_trimmed,
+        fluxes=flux_trimmed,
+        flux_errs=err_trimmed,
+        fit_pars=param
+    )
+    return param, param_err, reduced_chi_sq
 
 
 def fit_flare(dataset, flare):
@@ -221,14 +246,15 @@ def fit_flare(dataset, flare):
 
     # Fit rise section
     try:
-        rise_par, rise_par_err = fit_flare_section(
+        rise_par, rise_par_err, rise_rchi_sq = fit_flare_section(
             dataset,
-            start_idx=flare.rise,
-            end_idx=flare.peak,
+            start_idx=flare.rise_idx,
+            end_idx=flare.peak_idx,
             background_flux=flare.background_estimate)
         flare.rise_slope = rise_par[0]
         flare.rise_slope_err = rise_par_err[0]
         flare.rise_fit_pars = rise_par.tolist()
+        flare.rise_reduced_chi_sq = rise_rchi_sq
 
     except Exception as e:
         logger.exception("Rise fit failed:")
@@ -237,14 +263,15 @@ def fit_flare(dataset, flare):
 
     # Fit decline section
     try:
-        fall_par, fall_par_err = fit_flare_section(
+        fall_par, fall_par_err, fall_rchi_sq = fit_flare_section(
             dataset,
-            start_idx=flare.peak,
-            end_idx=flare.fall,
+            start_idx=flare.peak_idx,
+            end_idx=flare.fall_idx,
             background_flux=flare.background_estimate)
         flare.decay_slope = fall_par[0]
         flare.decay_slope_err = fall_par_err[0]
         flare.decay_fit_pars = fall_par.tolist()
+        flare.decay_reduced_chi_sq = fall_rchi_sq
     except Exception as e:
         logger.exception("Fall fit failed:")
         pass

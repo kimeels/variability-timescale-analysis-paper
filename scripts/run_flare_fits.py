@@ -140,9 +140,10 @@ def analyze_dataset(dataset_id, dataset_filepath, data_index):
 
     elif fit_method == FitMethods.paper_single_flare:
         # Single visually identified flare
-        single_flare = Flare(rise=0, trigger=0,
-                             peak=np.argmax(fluxes),
-                             fall=len(fluxes) - 1
+        single_flare = Flare(rise_idx=0, trigger_idx=0,
+                             peak_idx=np.argmax(fluxes),
+                             peak_flux=np.max(fluxes),
+                             fall_idx=len(fluxes) - 1
                              )
         flares = [single_flare, ]
         fit_flare(dataset, single_flare)
@@ -223,8 +224,8 @@ def save_results(dataset_id, dataset, flares,
         flare_filename = ("{}_flare_{}_t{}_t{}." + PLOT_FORMAT).format(
             dataset_id,
             flr_count,
-            timestamps[flr.rise],
-            timestamps[flr.fall]
+            timestamps[flr.rise_idx],
+            timestamps[flr.fall_idx]
         )
         plt.savefig(os.path.join(dataset_dir, flare_filename))
         plt.clf()
