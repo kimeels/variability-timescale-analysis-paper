@@ -1,0 +1,15 @@
+# Sky densities calculated for the flux density limit of 0.1mJy
+type rate(deg^-2)
+AGN 2.2768
+SN 0.2078
+XRB 0.00024
+GRB 0.052
+Nova 0.0023
+RSCVn 0.0108
+Flare_Stars 0.0064
+Algol 0.0618
+magCV 0.0390
+DN 0.0013
+TDE 0.5196
+Magnetar 0.00000001
+
