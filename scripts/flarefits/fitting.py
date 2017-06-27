@@ -37,12 +37,12 @@ class Flare(object):
     decay_reduced_chi_sq = attrib(default=None)
 
 
-def find_and_fit_flares(dataset, background, noise_level):
+def find_and_fit_flares(dataset, background, noise_level, fit_method):
     flares = find_flares(dataset,
                          background=background,
                          noise_level=noise_level)
     for flare_marker in flares:
-        fit_flare(dataset, flare_marker)
+        fit_flare(dataset, flare_marker, fit_method)
     logger.info("Found {} flares".format(len(flares)))
 
     return flares
@@ -224,7 +224,7 @@ def fit_flare_section(dataset, start_idx, end_idx, background_flux):
     return param, param_err, reduced_chi_sq
 
 
-def fit_flare(dataset, flare, fit_method=None):
+def fit_flare(dataset, flare, fit_method):
     """
     Attempt to fit exponential rise / decay models to data marked as a flare.
 
@@ -239,10 +239,13 @@ def fit_flare(dataset, flare, fit_method=None):
     """
 
     # Estimate the background as the minimum value in the dataset
-    if fit_method is None:
-        flare.background_estimate = np.min(dataset[DataCols.flux])
-    elif fit_method == FitMethods.paper_single_flare:
+    if fit_method in (FitMethods.paper_single_flare, FitMethods.gbi):
+        # Assume flux calibration is reasonable for these data
         flare.background_estimate = 0
+    else:
+        # Background estimate may be off, shift by minimum value:
+        # (This avoids attempting to take log of negative values!)
+        flare.background_estimate = np.min(dataset[DataCols.flux])
 
     # Initialise empty data-struct, in case one / both fits fail
 

@@ -117,26 +117,22 @@ def analyze_dataset(dataset_id, dataset_filepath, data_index):
         clipped_fluxes = get_sigma_clipped_fluxes(dataset[DataCols.flux])
         background_estimate = np.ma.median(clipped_fluxes)
         noise_estimate = median_absolute_deviation(clipped_fluxes)
-        flares = find_and_fit_flares(
-            dataset,
-            background=background_estimate,
-            noise_level=noise_estimate)
+        flares = find_and_fit_flares(dataset, background=background_estimate,
+                                     noise_level=noise_estimate,
+                                     fit_method=fit_method)
     elif fit_method == FitMethods.gbi_single_flare:
         dataset[DataCols.flux] = smooth_with_window(dataset[DataCols.flux])
         background_estimate = np.percentile(fluxes, 15.)
         noise_estimate = np.mean(dataset[DataCols.flux_err])
-        flares = find_and_fit_flares(
-            dataset,
-            background=background_estimate,
-            noise_level=noise_estimate)
+        flares = find_and_fit_flares(dataset, background=background_estimate,
+                                     noise_level=noise_estimate,
+                                     fit_method=fit_method)
     elif fit_method == FitMethods.paper:
         background_estimate = np.percentile(fluxes, 15.)
         noise_estimate = np.mean(dataset[DataCols.flux_err])
-        flares = find_and_fit_flares(
-            dataset,
-            background=background_estimate,
-            noise_level=noise_estimate
-        )
+        flares = find_and_fit_flares(dataset, background=background_estimate,
+                                     noise_level=noise_estimate,
+                                     fit_method=fit_method)
 
     elif fit_method == FitMethods.paper_single_flare:
         # Single visually identified flare
