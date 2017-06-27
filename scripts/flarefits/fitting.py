@@ -3,14 +3,12 @@ from __future__ import print_function
 import logging
 
 import numpy as np
-from astropy.stats import sigma_clip
+from astropy.stats import median_absolute_deviation, sigma_clip
+from scipy.optimize import curve_fit
+
 from attr import attrib, attrs
 from attr.validators import instance_of
-from scipy.optimize import curve_fit
-from astropy.stats import median_absolute_deviation
-
-import flarefits.ingest as ingest
-from flarefits.ingest import DataCols
+from flarefits.ingest import DataCols, FitMethods
 
 logger = logging.getLogger(__name__)
 
@@ -226,13 +224,14 @@ def fit_flare_section(dataset, start_idx, end_idx, background_flux):
     return param, param_err, reduced_chi_sq
 
 
-def fit_flare(dataset, flare):
+def fit_flare(dataset, flare, fit_method=None):
     """
     Attempt to fit exponential rise / decay models to data marked as a flare.
 
     Args:
         dataset (dict): Dictionary representing dataset
         flare (Flare): Flare boundaries.
+        fit_method:
 
     Returns:
         Flare: Class containing fitted flare parameters
@@ -240,7 +239,10 @@ def fit_flare(dataset, flare):
     """
 
     # Estimate the background as the minimum value in the dataset
-    flare.background_estimate = np.min(dataset[DataCols.flux])
+    if fit_method is None:
+        flare.background_estimate = np.min(dataset[DataCols.flux])
+    elif fit_method == FitMethods.paper_single_flare:
+        flare.background_estimate = 0
 
     # Initialise empty data-struct, in case one / both fits fail
 

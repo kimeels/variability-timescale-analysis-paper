@@ -143,10 +143,11 @@ def analyze_dataset(dataset_id, dataset_filepath, data_index):
         single_flare = Flare(rise_idx=0, trigger_idx=0,
                              peak_idx=np.argmax(fluxes),
                              peak_flux=np.max(fluxes),
-                             fall_idx=len(fluxes) - 1
+                             fall_idx=len(fluxes) - 1,
                              )
         flares = [single_flare, ]
-        fit_flare(dataset, single_flare)
+        fit_flare(dataset, single_flare,
+                  fit_method=fit_method)
         # Dummy values, passed to plotting routines:
         background_estimate = None
         noise_estimate = None
