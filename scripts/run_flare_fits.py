@@ -176,7 +176,7 @@ def save_results(dataset_id, dataset, flares,
     dataset_dir = os.path.join(method_dir, dataset_id)
     ensure_dir(dataset_dir)
     write_flares_to_json(
-        os.path.join(method_dir, dataset_id + '_flares.json'),
+        os.path.join(output_dir, dataset_id + '_flares.json'),
         flares)
 
     fig = plt.gcf()
