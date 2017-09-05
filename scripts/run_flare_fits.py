@@ -11,6 +11,7 @@ from collections import defaultdict
 import attr
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from matplotlib import gridspec
 from astropy.stats import median_absolute_deviation
 
@@ -57,7 +58,7 @@ def main():
     # pp.pprint(data_files)
 
     # Check the index / datafiles look sensible
-    check_data_files_and_index(data_files, data_index)
+    ##check_data_files_and_index(data_files, data_index)
 
     # Go do science...
     for fpath in data_files:
@@ -106,12 +107,15 @@ def analyze_dataset(dataset_id, dataset_filepath, data_index):
     For each data file, check the index and run the corresponding analysis.
     """
     fit_method = data_index[dataset_id][IndexCols.fit_method]
+    target_class = data_index[dataset_id][IndexCols.target_class]
     logger.info("Analyzing dataset {}, fit method {}, from path {}".format(
         dataset_id, fit_method, dataset_filepath))
     logger.debug("(Path: {}".format(dataset_filepath))
     # logger.debug("Method: {}".format(fit_method))
     dataset = ingest.load_dataset(dataset_filepath, dataset_id, fit_method)
     fluxes = dataset[DataCols.flux]
+    print(dataset_id)
+    print(type(dataset_id))
 
     if fit_method == FitMethods.gbi:
         clipped_fluxes = get_sigma_clipped_fluxes(dataset[DataCols.flux])
@@ -119,20 +123,26 @@ def analyze_dataset(dataset_id, dataset_filepath, data_index):
         noise_estimate = median_absolute_deviation(clipped_fluxes)
         flares = find_and_fit_flares(dataset, background=background_estimate,
                                      noise_level=noise_estimate,
-                                     fit_method=fit_method)
+                                     fit_method=fit_method,
+                                     target_class=target_class,
+                                     dataset_id=dataset_id)
     elif fit_method == FitMethods.gbi_single_flare:
         dataset[DataCols.flux] = smooth_with_window(dataset[DataCols.flux])
         background_estimate = np.percentile(fluxes, 15.)
         noise_estimate = np.mean(dataset[DataCols.flux_err])
         flares = find_and_fit_flares(dataset, background=background_estimate,
                                      noise_level=noise_estimate,
-                                     fit_method=fit_method)
+                                     fit_method=fit_method,
+                                     target_class=target_class,
+                                     dataset_id=dataset_id)
     elif fit_method == FitMethods.paper:
         background_estimate = np.percentile(fluxes, 15.)
         noise_estimate = np.mean(dataset[DataCols.flux_err])
         flares = find_and_fit_flares(dataset, background=background_estimate,
                                      noise_level=noise_estimate,
-                                     fit_method=fit_method)
+                                     fit_method=fit_method,
+                                     target_class=target_class,
+                                     dataset_id=dataset_id)
 
     elif fit_method == FitMethods.paper_single_flare:
         # Single visually identified flare
@@ -140,7 +150,8 @@ def analyze_dataset(dataset_id, dataset_filepath, data_index):
                              peak_idx=np.argmax(fluxes),
                              peak_flux=np.max(fluxes),
                              fall_idx=len(fluxes) - 1,
-                             )
+                             target_class=target_class,
+                             dataset_id=dataset_id)
         flares = [single_flare, ]
         fit_flare(dataset, single_flare,
                   fit_method=fit_method)
@@ -175,8 +186,8 @@ def save_results(dataset_id, dataset, flares,
     method_dir = os.path.join(output_dir, fit_method)
     dataset_dir = os.path.join(method_dir, dataset_id)
     ensure_dir(dataset_dir)
-    write_flares_to_json(
-        os.path.join(output_dir, dataset_id + '_flares.json'),
+    write_flares_to_csv(
+        os.path.join(output_dir, dataset_id + '_flares.csv'),
         flares)
 
     fig = plt.gcf()
@@ -227,6 +238,9 @@ def save_results(dataset_id, dataset, flares,
         plt.savefig(os.path.join(dataset_dir, flare_filename))
         plt.clf()
 
+def write_flares_to_csv(output_path, flares):
+    df = pd.DataFrame([vars(f) for f in flares])
+    df.to_csv(output_path, sep='\t', encoding='utf-8')
 
 def write_flares_to_json(output_path, flares):
     flare_fits_dicts = [attr.asdict(flr) for flr in flares]
