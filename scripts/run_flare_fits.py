@@ -114,8 +114,8 @@ def analyze_dataset(dataset_id, dataset_filepath, data_index):
     # logger.debug("Method: {}".format(fit_method))
     dataset = ingest.load_dataset(dataset_filepath, dataset_id, fit_method)
     fluxes = dataset[DataCols.flux]
-    print(dataset_id)
-    print(type(dataset_id))
+    # print(dataset_id)
+    # print(type(dataset_id))
 
     if fit_method == FitMethods.gbi:
         clipped_fluxes = get_sigma_clipped_fluxes(dataset[DataCols.flux])
