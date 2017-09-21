@@ -35,12 +35,16 @@ class Flare(object):
     decay_fit_pars = attrib(default=None)
     rise_reduced_chi_sq = attrib(default=None)
     decay_reduced_chi_sq = attrib(default=None)
+    target_class = attrib(instance_of(str))
+    dataset_id = attrib(instance_of(str))
 
 
-def find_and_fit_flares(dataset, background, noise_level, fit_method):
+
+
+def find_and_fit_flares(dataset, background, noise_level, fit_method,target_class,dataset_id):
     flares = find_flares(dataset,
                          background=background,
-                         noise_level=noise_level)
+                         noise_level=noise_level,target_class=target_class,dataset_id=dataset_id)
     for flare_marker in flares:
         fit_flare(dataset, flare_marker, fit_method)
     logger.info("Found {} flares".format(len(flares)))
@@ -71,7 +75,7 @@ def get_sigma_clipped_fluxes(raw_fluxes):
     return clipped_fluxes
 
 
-def find_flares(dataset, background, noise_level):
+def find_flares(dataset, background, noise_level,target_class,dataset_id):
     """
     Find flares in ``dataset`` that peak more than 5*sigma above the background
 
@@ -144,7 +148,9 @@ def find_flares(dataset, background, noise_level):
                           rise_idx=rise,
                           peak_idx=peak_idx[0],
                           fall_idx=fall,
-                          peak_flux=peak_val)
+                          peak_flux=peak_val,
+                          target_class=target_class,
+                          dataset_id=dataset_id)
             flare_list.append(flare)
     return flare_list
 
@@ -317,16 +323,16 @@ def smooth_with_window(x, window_len=22, window='flat'):
     """
 
     if x.ndim != 1:
-        raise ValueError, "smooth only accepts 1 dimension arrays."
+        raise ValueError("smooth only accepts 1 dimension arrays.")
 
     if x.size < window_len:
-        raise ValueError, "Input vector needs to be bigger than window size."
+        raise ValueError("Input vector needs to be bigger than window size.")
 
     if window_len < 3:
         return x
 
     if not window in ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']:
-        raise ValueError, "Window is on of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'"
+        raise ValueError("Window is on of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'")
 
     # Concatenate the input with half-window length reflections at either end
     s = np.r_[x[window_len - 1:0:-1], x, x[-1:-window_len:-1]]
@@ -338,4 +344,4 @@ def smooth_with_window(x, window_len=22, window='flat'):
 
     y = np.convolve(w / w.sum(), s, mode='valid')
     # Return convolution after trimming end-reflections:
-    return y[(window_len / 2 - 1):-(window_len / 2)]
+    return y[int(window_len / 2 - 1):-int(window_len / 2)]
