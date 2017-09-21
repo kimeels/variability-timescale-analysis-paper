@@ -46,7 +46,7 @@ def plot_sigma_clipping_hist(dataset, ax):
 
     fluxes = dataset[DataCols.flux]
     hist, bin_edges = np.histogram(fluxes,
-                                   bins=max(len(fluxes) / 20, 15),
+                                   bins=int(max(len(fluxes) / 20, 15)),
                                    normed=True)
 
     clipped_fluxes = get_sigma_clipped_fluxes(fluxes)
