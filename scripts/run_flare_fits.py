@@ -106,8 +106,14 @@ def analyze_dataset(dataset_id, dataset_filepath, data_index):
     """
     For each data file, check the index and run the corresponding analysis.
     """
-    fit_method = data_index[dataset_id][IndexCols.fit_method]
-    target_class = data_index[dataset_id][IndexCols.target_class]
+    try:
+        cut_index = dataset_id.index('_')
+        fit_id = dataset_id[:cut_index]
+    except ValueError:
+        fit_id = dataset_id
+    print(fit_id)
+    fit_method = data_index[fit_id][IndexCols.fit_method]
+    target_class = data_index[fit_id][IndexCols.target_class]
     logger.info("Analyzing dataset {}, fit method {}, from path {}".format(
         dataset_id, fit_method, dataset_filepath))
     logger.debug("(Path: {}".format(dataset_filepath))
