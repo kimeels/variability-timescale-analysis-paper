@@ -6,7 +6,7 @@ import scipy.stats
 from matplotlib import gridspec
 from astropy.stats import median_absolute_deviation
 
-from .fitting import get_sigma_clipped_fluxes, straight_line
+from .fitting import get_sigma_clipped_fluxes, straight_line, expgaussexp
 from .ingest import DataCols
 
 logger = logging.getLogger(__name__)
@@ -121,10 +121,10 @@ def plot_single_flare_lightcurve(dataset, flare, ax=None):
                log_fluxes_minus_bg[flare_rise_idx],
                marker='o', color='Gold',
                )
-    ax.scatter(timestamps[flare_decay_idx],
-               log_fluxes_minus_bg[flare_decay_idx],
-               marker='o', color='Lime',
-               )
+    # ax.scatter(timestamps[flare_decay_idx],
+    #            log_fluxes_minus_bg[flare_decay_idx],
+    #            marker='o', color='Lime',
+    #            )
 
     plot_flare_markers(flare, timestamps, log_fluxes_minus_bg, ax)
 
@@ -132,12 +132,12 @@ def plot_single_flare_lightcurve(dataset, flare, ax=None):
     if flare.rise_slope is not None:
         ax.plot(timestamps[flare_rise_idx],
                 straight_line(timestamps[flare_rise_idx], *flare.rise_fit_pars),
-                'b-', )
+                'r-', )
     if flare.decay_slope is not None:
         ax.plot(timestamps[flare_decay_idx],
                 straight_line(timestamps[flare_decay_idx], *flare.decay_fit_pars),
                 'r-', )
-    # plt.ylim([np.log(np.percentile(fluxes, 0.5)), np.log(np.max(fluxes))])
+    plt.ylim([np.log(np.percentile(fluxes, 0.5)), np.log(np.max(fluxes))])
     return ax
 
 

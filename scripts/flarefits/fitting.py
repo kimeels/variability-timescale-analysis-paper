@@ -154,9 +154,19 @@ def find_flares(dataset, background, noise_level,target_class,dataset_id):
             flare_list.append(flare)
     return flare_list
 
+############################################################################################
+#                               Fitting Model                                              #
+############################################################################################
+
 
 def straight_line(x, gradient, intercept):
     return gradient * x + intercept
+
+def expgaussexp(x,A,mu,sigma,rtau,dtau):
+    c = ((x-mu)/sigma)
+    return np.piecewise(x,[c <= -rtau, (-rtau < c) & (c <= dtau), dtau < c], [lambda t: A*np.exp(0.5*rtau**2 + rtau*((t-mu)/sigma)),
+                                                                              lambda t: A*np.exp(-0.5*((t-mu)/sigma)**2),
+                                                                              lambda t: A*np.exp(0.5*dtau**2 -dtau*((t-mu)/sigma))] )
 
 
 def fit_simple_exponential(timestamps, fluxes, flux_errors):
@@ -172,7 +182,7 @@ def fit_simple_exponential(timestamps, fluxes, flux_errors):
     param, cov = curve_fit(f=straight_line,
                            xdata=timestamps,
                            ydata=np.log(fluxes),
-                           sigma=flux_errors / fluxes,
+                           #sigma=flux_errors / fluxes,
                            )
 
     param_err = np.sqrt(np.diag(cov))

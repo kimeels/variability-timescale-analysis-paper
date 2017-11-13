@@ -202,7 +202,7 @@ def read_gbi_datafile(path):
             return True
         else:
             return False
-
+    print(len(datarows[0]))
     datarows = [r for r in datarows if not is_bad_data(r)]
     # Sort the data by x value:
     datarows.sort(key=lambda pair: pair[0])
