@@ -35,7 +35,7 @@ logging.basicConfig(
 logger = logging.getLogger()
 
 PROJECT_ROOT = os.path.abspath('..')
-DATA_ROOT = os.path.join(PROJECT_ROOT, 'data')
+DATA_ROOT = os.path.join(PROJECT_ROOT, 'data.augment')
 INDEX_PATH = os.path.join(PROJECT_ROOT, "target-distances-and-class.txt")
 DEFAULT_OUTPUT_DIR = './results'
 PLOT_FORMAT = 'png'

@@ -6,80 +6,15 @@ import csv
 import os
 import seaborn as sns
 from astropy.stats import median_absolute_deviation, sigma_clip
+import george
+from george import kernels
+import scipy.optimize as op
 import gc
+from multiprocessing import Process
+import time
+import glob
+from gp_functions import *
 
-def get_sigma_clipped_fluxes(raw_fluxes):
-    """
-    Uses the astropy sigma_clip function to try and get rid of outliers.
-
-    ( https://astropy.readthedocs.org/en/stable/api/astropy.stats.sigma_clip.html )
-
-    Returns a masked array where all outlier values are masked.
-    """
-
-    # First we try to run sigma clip with the defaults - hopefully this will
-    # iterate until it converges:
-    clipped_fluxes = sigma_clip(raw_fluxes, iters=None,
-                                stdfunc=median_absolute_deviation)
-    # If it fails (number of unmasked values <3),
-    # then we just accept the result from a single iteration:
-    if len(clipped_fluxes.compressed()) < 3:
-        logger.warning("Sigma clipping did not converge, "
-                       "using single iteration")
-        clipped_fluxes = sigma_clip(raw_fluxes, iters=1,
-                                    stdfunc=median_absolute_deviation)
-    return clipped_fluxes
-
-
-def get_ls(x,y,err):
-    clipped_fluxes = get_sigma_clipped_fluxes(y)
-    background = np.ma.median(clipped_fluxes)
-    noise = median_absolute_deviation(clipped_fluxes)
-
-    rise_threshold = background + 5 * noise
-    fall_threshold = background + 1 * noise
-    flux_plus_err = y + err
-
-    trigger = np.where(flux_plus_err > rise_threshold)[0]
-    if len(trigger) == 0:
-        trigger = np.where(flux_plus_err == np.max(flux_plus_err))[0][0]
-    else:
-        trigger = trigger[0]
-
-    indexes = np.where(y < fall_threshold)[0]
-    if len(indexes) == 0:
-        indexes = np.where(y < background)[0]
-
-    fall_indexes = np.array([indexes[i] for i in range(len(indexes)-1) if y[indexes[i]] > y[indexes[i+1]]])
-
-    fall = np.where(fall_indexes > trigger)[0]
-    if len(fall) == 0:
-        fall_idx = len(y) - 1
-    else:
-        fall_idx = fall_indexes[np.where(fall_indexes > trigger)][0]
-
-    rise = np.where(indexes <= trigger)[0]
-    if len(rise) == 0:
-        rise_idx = trigger
-    else:
-        rise_idx = indexes[np.where(indexes < trigger)][-1]
-
-    return  ((x[fall_idx] - x[rise_idx]))/(2*np.sqrt(2*np.log(2)))
-
-def loadfile(file):
-    if "GBI" in file:
-        data = np.loadtxt(file)
-        x,y,err = data[:,0],data[:,3],data[:,6]
-        y_eq_minus1 = np.where(y == -1)
-        y = np.delete(y,y_eq_minus1)
-        x = np.delete(x,y_eq_minus1)
-        err =  np.delete(err,y_eq_minus1)
-
-    else:
-        data = np.loadtxt(file)
-        x,y,err = data[:,0],data[:,1],data[:,2]
-
-    return x,y,err
 
 
 def sample_curve(x,y,err,xsample_range,num_of_sample_curves,filename):
@@ -119,7 +54,83 @@ def sample_curve(x,y,err,xsample_range,num_of_sample_curves,filename):
     return xnew,ynew
 
 
+def sample_curve_v2(x,y,err,xsample_range,num_of_curves,filename):
+    ls = get_ls(x,y,err)
 
+    k1 = np.var(y)* kernels.ExpSquaredKernel(ls**2)
+    k2 = 1 * kernels.RationalQuadraticKernel(log_alpha=1, metric=ls**2)
+    kernel = k1 + k2
+
+    gp = george.GP(kernel, fit_mean=True)
+    gp.compute(x,err)
+
+    # Define the objective function (negative log-likelihood in this case).
+    def nll(p):
+        gp.set_parameter_vector(p)
+        ll = gp.lnlikelihood(y, quiet=True)
+        return -ll if np.isfinite(ll) else 1e25
+
+    # And the gradient of the objective function.
+    def grad_nll(p):
+        gp.set_parameter_vector(p)
+        return -gp.grad_lnlikelihood(y, quiet=True)
+
+    p0 = gp.get_parameter_vector()
+    results = op.minimize(nll, p0, jac=grad_nll, method="L-BFGS-B")
+    gp.set_parameter_vector(results.x)
+
+    xnew = xsample_range
+    ynew = gp.sample_conditional(y,xnew,number_of_curves)
+
+    t = np.linspace(np.min(x), np.max(x), 100)
+    mu, cov = gp.predict(y, t)
+
+    pl.errorbar(x,y,err,fmt='kx')
+    pl.plot(t,mu)
+    pl.fill_between(t, mu - 2*np.sqrt(std**2), mu + 2*np.sqrt(std**2), color='blue', alpha=0.2)
+    pl.savefig(filename+'.pdf')
+
+    # mu, cov = gp.predict(y, t)
+    # std = np.sqrt(np.diag(cov))
+
+
+    return xnew,ynew
+
+def augment(datafile,number_of_curves):
+    x,y,err = loadfile(datafile)
+
+    sample_rate = 2/(24*60*60)
+
+
+    xmax = np.max(x)
+    i = 0
+    xbeg = np.min(x)
+    xend = np.min(x)
+    while xend < xmax:
+
+    xsample_range = np.linspace(np.min(x),np.max(x),1000)
+    print('Sampling file: ', datafile)
+    print('---------------------------------------------------------------')
+    #try:
+    if datafile.endswith('.txt'):
+        datafile = datafile[:-4]
+    filename = data_augment_root + datafile[len(root):]
+    #xnew,ynew = sample_curve(x,y,err,xsample_range,number_of_curves,filename)
+    #mu,std = sample_curve_v2(x,y,err,xsample_range,filename)
+
+    xnew,ynew = sample_curve_v2(x,y,err,xsample_range,number_of_curves,filename)
+
+    if "GBI" in file:
+        z = np.zeros(len(xnew))
+        for i in range(number_of_curves):
+            with open(filename +'_'+str(i),'w+') as f:
+                    writer = csv.writer(f, delimiter='\t')
+                    writer.writerows(zip(xnew,z,z,ynew[i],z,z,z))
+    else:
+        for i in range(number_of_curves):
+            with open(filename +'_'+str(i),'w+') as f:
+                writer = csv.writer(f, delimiter='\t')
+                writer.writerows(zip(xnew,ynew[i],np.zeros(len(xnew))))
 
 
 print("#######################################################################")
@@ -130,6 +141,8 @@ print("")
 root = "../data/"
 data_augment_root = "../data.augment/"
 
+all_files = glob.glob(os.path.join(root, "RSCVn/GBI/*"),recursive=True)
+
 allfiles = []
 for path, subdirs, files in os.walk(root):
     subdirs[:] = [d for d in subdirs if d not in ['GBI']]
@@ -137,37 +150,25 @@ for path, subdirs, files in os.walk(root):
         f = os.path.join(path, filename)
         allfiles.append(f)
 
-not_good = ["../data/TDE/ASASSN-14li.txt",
-               "../data/DwarfNova/SSCyg.txt",
-               "../data/XRB/CygX-2p.txt",
-               "../data/XRB/M31ULX.txt",
-               "../data/GRB/GRB110709B.txt",
-               "../data/GRB/GRB060418.txt",
-               "../data/RSCVn/CFOct.txt",
-               "../data/Flare-Star/AUMic.txt",
-               "../data/Flare-Star/ADLeo",
-               "../data/Magnetic-CV/V834Cen.txt"]
+not_good = ["../data/DwarfNova/SSCyg.txt",
+               "../data/XRB/MAXIJ1836-194"]
 
-number_of_curves = 10
+number_of_curves = 20
 
-for j in range(len(allfiles)):
-    datafile = allfiles[j]
-    if datafile not in not_good:
-        x,y,err = loadfile(datafile)
-        xsample_range = np.arange(np.min(x),np.max(x),1/4)
-        print('Sampling file: ', datafile)
-        print('---------------------------------------------------------------')
-        #try:
-        if datafile.endswith('.txt'):
-            datafile = datafile[:-4]
-        filename = data_augment_root + datafile[len(root):]
-        xnew,ynew = sample_curve(x,y,err,xsample_range,number_of_curves,filename)
+if __name__ == '__main__':
+    for j in range(len(all_files)):
+        datafile = all_files[j]
+        if datafile not in not_good:
+            p = Process(target=augment, args=(datafile,number_of_curves,))
+            p.start()
+            p.join()
+            gc.collect()
 
-        for i in range(number_of_curves):
-            with open(filename +'_'+str(i),'w+') as f:
-                writer = csv.writer(f, delimiter='\t')
-                writer.writerows(zip(xnew[:,0],ynew[i][:,0]))
 
-        gc.collect()
+        # for i in range(number_of_curves):
+        #     with open(filename +'_'+str(i),'w+') as f:
+        #         writer = csv.writer(f, delimiter='\t')
+        #         writer.writerows(zip(xnew[:,0],ynew[i][:,0]))
+
         # except Exception as e:
         #     print(datafile, e)
